@@ -10,24 +10,26 @@ app.use(express.json({ limit: "20kb" }));
 
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+
+const PRIMARY_MODEL = "gemini-3.8-flash";
+const FALLBACK_MODEL = "gemini-3.5-flash-lite";
 
 const MAX_CONCURRENT = 4;
-const MAX_ATTEMPTS = 3;
-const TIMEOUT_MS = 45000;
+const MAX_ATTEMPTS = 2;
+const TIMEOUT_MS = 30000;
 
 let activeRequests = 0;
 
-const sleep = (ms) =>
+const sleep = ms =>
   new Promise(resolve => setTimeout(resolve, ms));
 
-async function callGemini(message) {
+async function requestModel(message, model) {
   let lastError;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`,
         {
           method: "POST",
           headers: {
@@ -35,11 +37,9 @@ async function callGemini(message) {
           },
           signal: AbortSignal.timeout(TIMEOUT_MS),
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: message }]
-              }
-            ]
+            contents: [{
+              parts: [{ text: message }]
+            }]
           })
         }
       );
@@ -47,43 +47,44 @@ async function callGemini(message) {
       const data = await response.json().catch(() => ({}));
 
       if (response.ok) {
-        return { data };
+        return { data, model };
       }
 
-      const retryable = [429, 500, 502, 503, 504]
+      const error = new Error(
+        data.error?.message || "Erro Gemini"
+      );
+
+      error.status = response.status;
+      error.retryable = [429, 500, 502, 503, 504]
         .includes(response.status);
 
-      if (!retryable || attempt === MAX_ATTEMPTS - 1) {
-        return { response, data };
-      }
+      if (!error.retryable) throw error;
 
-      console.log(
-        `Gemini indisponível (${response.status}). Tentativa ${attempt + 2}/${MAX_ATTEMPTS}.`
-      );
-
-      const retryAfter = Number(response.headers.get("retry-after"));
-      const delay = retryAfter > 0
-        ? Math.min(retryAfter * 1000, 15000)
-        : 1000 * (2 ** attempt);
-
-      await sleep(delay);
-
-    } catch (error) {
       lastError = error;
 
-      if (attempt === MAX_ATTEMPTS - 1) {
-        throw error;
-      }
+    } catch (error) {
+      if (error.retryable === false) throw error;
+      lastError = error;
+    }
 
-      console.log(
-        `Falha de conexão. Nova tentativa ${attempt + 2}/${MAX_ATTEMPTS}.`
-      );
-
-      await sleep(1000 * (2 ** attempt));
+    if (attempt < MAX_ATTEMPTS - 1) {
+      await sleep(1500 * (attempt + 1));
     }
   }
 
-  throw lastError || new Error("Falha na conexão Gemini.");
+  throw lastError;
+}
+
+async function callGemini(message) {
+  try {
+    return await requestModel(message, PRIMARY_MODEL);
+  } catch (error) {
+    if (error.retryable === false) throw error;
+
+    console.log("Ativando modelo de reserva:", FALLBACK_MODEL);
+
+    return await requestModel(message, FALLBACK_MODEL);
+  }
 }
 
 app.get("/", (req, res) => {
@@ -116,7 +117,7 @@ app.post("/api/chat", async (req, res) => {
 
   if (activeRequests >= MAX_CONCURRENT) {
     return res.status(503).json({
-      error: "ORBEON AI está atendendo muitas solicitações. Aguarde alguns instantes."
+      error: "Muitas solicitações. Aguarde alguns instantes."
     });
   }
 
@@ -125,35 +126,23 @@ app.post("/api/chat", async (req, res) => {
   try {
     const result = await callGemini(message);
 
-    if (result.response) {
-      const status = result.response.status;
-
-      console.error("Erro Gemini:", status);
-
-      if (status === 429 || status === 503) {
-        return res.status(503).json({
-          error: "Gemini temporariamente indisponível. Tente novamente em instantes."
-        });
-      }
-
-      return res.status(status).json({
-        error: result.data.error?.message ||
-          "Não foi possível processar sua solicitação."
-      });
-    }
-
     const answer =
       result.data.candidates?.[0]?.content?.parts
         ?.map(part => part.text || "")
         .join("") || "Não foi possível gerar uma resposta.";
 
+    console.log("Resposta gerada pelo modelo:", result.model);
+
     return res.json({ answer });
 
   } catch (error) {
-    console.error("Falha de comunicação com Gemini:", error.code || error.name);
+    console.error(
+      "Falha Gemini:",
+      error.status || error.code || error.name
+    );
 
-    return res.status(504).json({
-      error: "A resposta demorou além do esperado. Tente novamente."
+    return res.status(503).json({
+      error: "Os modelos de inteligência estão temporariamente indisponíveis. Tente novamente."
     });
 
   } finally {
