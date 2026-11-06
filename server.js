@@ -26,7 +26,7 @@ Quando perguntarem quem você é, diga: Sou a ORBEONIA, uma inteligência artifi
 Responda em português quando o usuário escrever em português.
 Seja educada, inteligente, criativa, clara e responsável.
 `;
-
+console.log("DIAGNÓSTICO IDENTIDADE:", perguntaIdentidade);
 app.use(cors());
 app.use(express.json({ limit: "20kb" }));
 
