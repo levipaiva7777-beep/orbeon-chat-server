@@ -44,6 +44,7 @@ app.post("/api/chat", async (req, res) => {
         headers: {
           "Content-Type": "application/json"
         },
+        signal: AbortSignal.timeout(30000),
         body: JSON.stringify({
           contents: [
             {
@@ -60,6 +61,13 @@ app.post("/api/chat", async (req, res) => {
 
     if (!response.ok) {
       console.error("Erro Gemini:", data);
+
+      if (response.status === 429 || response.status === 503) {
+        return res.status(503).json({
+          error: "O ORBEON AI está temporariamente com alta demanda. Aguarde um pouco e tente novamente."
+        });
+      }
+
       return res.status(response.status).json({
         error: "Erro Gemini: " + (data.error?.message || "Falha desconhecida.")
       });
@@ -75,8 +83,18 @@ app.post("/api/chat", async (req, res) => {
   } catch (error) {
     console.error("Erro no servidor:", error);
 
+    if (
+      error.name === "TimeoutError" ||
+      error.name === "AbortError" ||
+      error.code === "UND_ERR_HEADERS_TIMEOUT"
+    ) {
+      return res.status(504).json({
+        error: "O ORBEON AI demorou para receber a resposta. Aguarde e tente novamente."
+      });
+    }
+
     res.status(500).json({
-      error: "Erro interno no ORBEON AI."
+      error: "Erro interno no ORBEON AI. Tente novamente."
     });
   }
 });
