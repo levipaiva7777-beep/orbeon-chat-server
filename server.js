@@ -137,7 +137,19 @@ app.post("/api/chat", async (req, res) => {
       error: "Envie uma mensagem válida."
     });
   }
+  const pergunta = message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 
+  const perguntaIdentidade =
+    /quem e voce|qual e seu nome|qual seu nome|voce e (orbeon|orbeonia|gemini)|quem criou (a )?(orbeon|orbeonia)|quem desenvolveu (a )?(orbeon|orbeonia)|voce foi criada/.test(pergunta);
+
+  if (perguntaIdentidade) {
+    return res.json({
+      answer: "Sou a ORBEONIA, uma inteligência artificial do universo ORBEON, projeto idealizado por Levi Paiva de Macedo. Utilizo modelos de inteligência artificial, como o Gemini, como tecnologia para gerar minhas respostas. Minha identidade é ORBEONIA!"
+    });
+  }
   if (activeRequests >= MAX_CONCURRENT) {
     return res.status(503).json({
       error: "Muitas solicitações. Aguarde alguns instantes."
