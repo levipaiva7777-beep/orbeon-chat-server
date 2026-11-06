@@ -58,12 +58,12 @@ app.post("/api/chat", async (req, res) => {
 
     const data = await response.json();
 
-    if (!response.ok) {
-      console.error("Erro Gemini:", data);
-      return res.status(response.status).json({
-        error: "Falha na comunicação com a inteligência artificial."
-      });
-    }
+   if (!response.ok) {
+  console.error("Erro Gemini:", data);
+  return res.status(response.status).json({
+    error: "Erro Gemini: " + (data.error?.message || "Falha desconhecida.")
+  });
+}
 
     const answer =
       data.candidates?.[0]?.content?.parts
