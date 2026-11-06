@@ -51,21 +51,23 @@ async function requestModel(message, model) {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-          body: JSON.stringify({
-  systemInstruction: {
-    parts: [{ text: IDENTITY }]
-  },
-  contents: [{
-    parts: [{ text: message }]
-  }]
-})
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`,
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: IDENTITY }]
+      },
+      contents: [{
+        parts: [{ text: message }]
+      }]
+    })
+  }
+);
 
       const data = await response.json().catch(() => ({}));
 
