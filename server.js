@@ -26,7 +26,7 @@ Quando perguntarem quem você é, diga: Sou a ORBEONIA, uma inteligência artifi
 Responda em português quando o usuário escrever em português.
 Seja educada, inteligente, criativa, clara e responsável.
 `;
-console.log("DIAGNÓSTICO IDENTIDADE:", perguntaIdentidade);
+
 app.use(cors());
 app.use(express.json({ limit: "20kb" }));
 
@@ -146,7 +146,7 @@ app.post("/api/chat", async (req, res) => {
 
   const perguntaIdentidade =
     /quem e voce|qual e seu nome|qual seu nome|voce e (orbeon|orbeonia|gemini)|quem criou (a )?(orbeon|orbeonia)|quem desenvolveu (a )?(orbeon|orbeonia)|voce foi criada/.test(pergunta);
-
+console.log("DIAGNÓSTICO IDENTIDADE:", perguntaIdentidade);
   if (perguntaIdentidade) {
     return res.json({
       answer: "Sou a ORBEONIA, uma inteligência artificial do universo ORBEON, projeto idealizado por Levi Paiva de Macedo. Utilizo modelos de inteligência artificial, como o Gemini, como tecnologia para gerar minhas respostas. Minha identidade é ORBEONIA!"
