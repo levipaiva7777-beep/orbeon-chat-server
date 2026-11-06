@@ -48,12 +48,13 @@ async function requestModel(message, model) {
           },
           signal: AbortSignal.timeout(TIMEOUT_MS),
           body: JSON.stringify({
-            contents: [{
-              parts: [{ text: message }]
-            }]
-          })
-        }
-      );
+  systemInstruction: {
+    parts: [{ text: IDENTITY }]
+  },
+  contents: [{
+    parts: [{ text: message }]
+  }]
+})
 
       const data = await response.json().catch(() => ({}));
 
